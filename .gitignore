@@ -37,3 +37,5 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+sample_incoming_patients_*.json
