@@ -12,8 +12,8 @@ name: Deploy to QA
 
 on:
   push:
-    branches:
-      - main
+    # branches:
+    # - main
   workflow_dispatch:
 
 permissions:
