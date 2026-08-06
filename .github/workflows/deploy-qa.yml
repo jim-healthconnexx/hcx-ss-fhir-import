@@ -1,0 +1,89 @@
+# HDC-221: Build the Docker image, push to ECR, and deploy to the QA ECS service.
+#
+# Required GitHub Secrets:
+#   AWS_ROLE_ARN_QA          – IAM role ARN for OIDC federation from GitHub Actions
+#   AWS_REGION               – AWS region (e.g. us-east-1)
+#   ECR_REPOSITORY_QA        – ECR repository name (e.g. hcx-ss-fhir-import)
+#   ECS_CLUSTER_QA           – ECS cluster name (e.g. hcx-ss-process-qa)
+#   ECS_SERVICE_QA           – ECS service name (e.g. hcx-ss-fhir-import-qa)
+#   ECS_TASK_DEFINITION_QA   – Task definition family name (e.g. hcx-ss-fhir-import-qa)
+
+name: Deploy to QA
+
+on:
+  push:
+    # branches:
+    # - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Build and Deploy to QA
+    runs-on: ubuntu-latest
+    environment: hcx-qa
+
+    steps:
+      - name: HDC-221 Checkout source
+        uses: actions/checkout@v4
+
+      - name: HDC-221 Set up Java 21 (Temurin) with Maven cache
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      - name: HDC-221 Build JAR (skip tests)
+        run: ./mvnw -q -DskipTests package
+
+      - name: HDC-221 Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_QA }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: HDC-221 Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: HDC-221 Build and push Docker image (linux/amd64) to ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_QA }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker buildx build --platform linux/amd64 \
+            -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
+            -t "$ECR_REGISTRY/$ECR_REPOSITORY:latest" \
+            --push .
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: HDC-221 Download current ECS task definition JSON
+        env:
+          ECS_TASK_DEFINITION: ${{ secrets.ECS_TASK_DEFINITION_QA }}
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$ECS_TASK_DEFINITION" \
+            --query taskDefinition \
+            > task-definition.json
+
+      - name: HDC-221 Render updated task definition with new image URI
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: hcx-ss-fhir-import
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: HDC-221 Register and deploy new task definition to QA ECS service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          service: ${{ secrets.ECS_SERVICE_QA }}
+          cluster: ${{ secrets.ECS_CLUSTER_QA }}
+          wait-for-service-stability: true

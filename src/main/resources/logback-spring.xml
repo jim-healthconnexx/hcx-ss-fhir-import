@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    HDC-90: Logback configuration.
+    Console appender is active in ALL environments (stdout captured by Docker / ECS awslogs → CloudWatch).
+    Root log level defaults are set per Spring profile, then overrideable at runtime via
+    /actuator/loggers or PUT /api/v1/admin/log-level without a restart.
+-->
+<configuration>
+
+    <!-- HDC-90: Shared pattern: timestamp | level | thread | abbreviated logger | message -->
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %-40.40logger{39} : %msg%n"/>
+
+    <!-- =====================================================================
+         Console appender — all environments
+         ===================================================================== -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- =====================================================================
+         Root logger — defaults per profile.
+         These are starting defaults; runtime changes via /actuator/loggers
+         or PUT /api/v1/admin/log-level take effect immediately without restart.
+         ===================================================================== -->
+
+    <springProfile name="local">
+        <!-- HDC-90: local — INFO; raise to DEBUG via Actuator if needed. -->
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="qa">
+        <!-- HDC-90: qa — INFO; stdout only (CloudWatch via ECS awslogs driver). -->
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="prod">
+        <!-- HDC-90: prod — WARN by default; only failures and unexpected situations. -->
+        <root level="WARN">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- HDC-90: Fallback for any profile not matched above (e.g. unit tests). -->
+    <springProfile name="!local &amp; !qa &amp; !prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+</configuration>
