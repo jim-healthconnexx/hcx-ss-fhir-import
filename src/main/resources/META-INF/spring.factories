@@ -1,0 +1,3 @@
+# HDC-221: Register DbSecretsEnvironmentPostProcessor so it runs before DataSource auto-config
+org.springframework.boot.env.EnvironmentPostProcessor=\
+  com.healthconnexx.hcxssfhirimport.config.DbSecretsEnvironmentPostProcessor
