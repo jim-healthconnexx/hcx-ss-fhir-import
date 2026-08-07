@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * HDC-221: Persists a {@link MappedBundle} to the medication_history schema using jOOQ.
+ * HDC-221: Persists a {@link MappedBundle} to the fhir schema using jOOQ.
  *
  * <p>Insertion order respects FK dependencies:
  * bundle → bundle_link/bundle_resource →
@@ -139,7 +139,8 @@ public class FhirImportWriter {
                            MappedBundle bundle, String assigningAuthority) {
         Map<String, Object> resolvedColumns = resolveColumns(row, pkMap, tableName, bundle, assigningAuthority);
 
-        InsertSetStep<?> insertStep = dslContext.insertInto(table(name("medication_history", tableName)));
+        // HDC-228: Tables are in the fhir schema, not medication_history.
+        InsertSetStep<?> insertStep = dslContext.insertInto(table(name("fhir", tableName)));
         InsertSetMoreStep<?> step = null;
         for (Map.Entry<String, Object> col : resolvedColumns.entrySet()) {
             if (step == null) {

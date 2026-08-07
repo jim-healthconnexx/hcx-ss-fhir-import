@@ -77,7 +77,9 @@ public class DbSecretsEnvironmentPostProcessor implements EnvironmentPostProcess
             String username = requiredKey(secretMap, "username", secretArn);
             String password = requiredKey(secretMap, "password", secretArn);
 
-            String jdbcUrl = String.format("jdbc:postgresql://%s:%s/%s", host, port, dbname);
+            // HDC-228: Strip any currentSchema from the secret's dbname and force fhir schema.
+            String dbOnly = dbname.contains("?") ? dbname.substring(0, dbname.indexOf('?')) : dbname;
+            String jdbcUrl = String.format("jdbc:postgresql://%s:%s/%s?currentSchema=fhir", host, port, dbOnly);
 
             Map<String, Object> props = new HashMap<>();
             props.put("spring.datasource.url", jdbcUrl);
