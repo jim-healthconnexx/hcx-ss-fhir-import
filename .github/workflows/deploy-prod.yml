@@ -1,29 +1,21 @@
-# HDC-221: Build the Docker image, push to ECR, and deploy to the Production ECS service.
+# HDC-221: Build the Docker image, push to ECR, and register a new task definition revision.
+# This app runs as a standalone ECS task — no ECS service.
+# Production deploy is manual-only.
 #
-# Triggers:
-#   - Manual dispatch (workflow_dispatch)
-#   - Version tag push (v*) — e.g. `git tag v1.2.3 && git push --tags`
-#
-# Required GitHub Secrets:
+# Required GitHub Secrets (Settings → Secrets → Environments → hcx-prod):
 #   AWS_ROLE_ARN_PROD          – IAM role ARN for OIDC federation from GitHub Actions
 #   AWS_REGION                 – AWS region (e.g. us-east-1)
 #   ECR_REPOSITORY_PROD        – ECR repository name (e.g. hcx-ss-fhir-import)
-#   ECS_CLUSTER_PROD           – ECS cluster name (e.g. hcx-ss-process-prod)
-#   ECS_SERVICE_PROD           – ECS service name (e.g. hcx-ss-fhir-import-prod)
 #   ECS_TASK_DEFINITION_PROD   – Task definition family name (e.g. hcx-ss-fhir-import-prod)
 
 name: Deploy to Production
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       reason:
         description: 'Reason for manual deploy'
-        required: false
-        default: 'manual hotfix'
+        required: true
 
 permissions:
   id-token: write
@@ -33,14 +25,15 @@ jobs:
   deploy:
     name: Build and Deploy to Production
     runs-on: ubuntu-latest
-    environment: production
+    # HDC-221: When production secrets are set up, create a hcx-prod GitHub environment,
+    # add secrets there, and set: environment: hcx-prod
 
     steps:
       - name: HDC-221 Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: HDC-221 Set up Java 21 (Temurin) with Maven cache
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: temurin
@@ -50,7 +43,7 @@ jobs:
         run: ./mvnw -q -DskipTests package
 
       - name: HDC-221 Configure AWS credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
           aws-region: ${{ secrets.AWS_REGION }}
@@ -59,21 +52,12 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: HDC-221 Resolve image tag (git tag or SHA for manual dispatch)
-        id: image-tag
-        run: |
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: HDC-221 Build and push Docker image (linux/amd64) to ECR
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_PROD }}
-          IMAGE_TAG: ${{ steps.image-tag.outputs.tag }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           docker buildx build --platform linux/amd64 \
             -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
@@ -97,11 +81,16 @@ jobs:
           task-definition: task-definition.json
           container-name: hcx-ss-fhir-import
           image: ${{ steps.build-image.outputs.image }}
+          environment-variables: |
+            SPRING_PROFILES_ACTIVE=prod
 
-      - name: HDC-221 Register and deploy new task definition to Production ECS service
+      - name: HDC-221 Register new task definition revision
+        id: register-task-def
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
+          # HDC-221: No service — standalone ECS task. Registering the new revision is sufficient.
           task-definition: ${{ steps.render-task-def.outputs.task-definition }}
-          service: ${{ secrets.ECS_SERVICE_PROD }}
-          cluster: ${{ secrets.ECS_CLUSTER_PROD }}
-          wait-for-service-stability: true
+
+      - name: HDC-221 Print registered task definition ARN
+        run: |
+          echo "Registered task definition ARN: ${{ steps.register-task-def.outputs.task-definition-arn }}"

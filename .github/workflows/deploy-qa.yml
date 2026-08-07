@@ -1,19 +1,23 @@
-# HDC-221: Build the Docker image, push to ECR, and deploy to the QA ECS service.
+# HDC-221: Build the Docker image, push to ECR, and register a new task definition revision.
+# This app runs as a standalone ECS task — no ECS service.
+# Registering a new revision is sufficient; the invoker picks it up on next run.
 #
-# Required GitHub Secrets:
+# Triggers:
+#   - Push to main
+#   - Manual dispatch (workflow_dispatch)
+#
+# Required GitHub Secrets (Settings → Secrets → Environments → hcx-qa):
 #   AWS_ROLE_ARN_QA          – IAM role ARN for OIDC federation from GitHub Actions
 #   AWS_REGION               – AWS region (e.g. us-east-1)
 #   ECR_REPOSITORY_QA        – ECR repository name (e.g. hcx-ss-fhir-import)
-#   ECS_CLUSTER_QA           – ECS cluster name (e.g. hcx-ss-process-qa)
-#   ECS_SERVICE_QA           – ECS service name (e.g. hcx-ss-fhir-import-qa)
 #   ECS_TASK_DEFINITION_QA   – Task definition family name (e.g. hcx-ss-fhir-import-qa)
 
 name: Deploy to QA
 
 on:
   push:
-    # branches:
-    # - main
+    #branches:
+     # - main
   workflow_dispatch:
 
 permissions:
@@ -28,10 +32,10 @@ jobs:
 
     steps:
       - name: HDC-221 Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: HDC-221 Set up Java 21 (Temurin) with Maven cache
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: temurin
@@ -41,7 +45,7 @@ jobs:
         run: ./mvnw -q -DskipTests package
 
       - name: HDC-221 Configure AWS credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN_QA }}
           aws-region: ${{ secrets.AWS_REGION }}
@@ -79,11 +83,16 @@ jobs:
           task-definition: task-definition.json
           container-name: hcx-ss-fhir-import
           image: ${{ steps.build-image.outputs.image }}
+          environment-variables: |
+            SPRING_PROFILES_ACTIVE=qa
 
-      - name: HDC-221 Register and deploy new task definition to QA ECS service
+      - name: HDC-221 Register new task definition revision
+        id: register-task-def
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
+          # HDC-221: No service — standalone ECS task. Registering the new revision is sufficient.
           task-definition: ${{ steps.render-task-def.outputs.task-definition }}
-          service: ${{ secrets.ECS_SERVICE_QA }}
-          cluster: ${{ secrets.ECS_CLUSTER_QA }}
-          wait-for-service-stability: true
+
+      - name: HDC-221 Print registered task definition ARN
+        run: |
+          echo "Registered task definition ARN: ${{ steps.register-task-def.outputs.task-definition-arn }}"
