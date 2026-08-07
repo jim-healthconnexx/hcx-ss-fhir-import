@@ -8,6 +8,7 @@ import static org.jooq.impl.DSL.val;
 import com.healthconnexx.hcxssfhirimport.mapping.FhirKey;
 import com.healthconnexx.hcxssfhirimport.mapping.MappedBundle;
 import com.healthconnexx.hcxssfhirimport.mapping.TableRow;
+import org.jooq.JSONB;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.DSLContext;
@@ -40,6 +41,9 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class FhirImportWriter {
+
+    // HDC-228: Columns that require JSONB binding — jOOQ will not auto-cast String → JSONB.
+    private static final Set<String> JSONB_COLUMNS = Set.of("source_payload");
 
     // HDC-221: Ordered list of table names for dependency-safe insertion.
     private static final List<String> INSERT_ORDER = List.of(
@@ -143,10 +147,15 @@ public class FhirImportWriter {
         InsertSetStep<?> insertStep = dslContext.insertInto(table(name("fhir", tableName)));
         InsertSetMoreStep<?> step = null;
         for (Map.Entry<String, Object> col : resolvedColumns.entrySet()) {
+            // HDC-228: Wrap source_payload (and any future jsonb columns) with JSONB.valueOf so
+            // jOOQ sends the correct JDBC type instead of binding as VARCHAR.
+            Object colValue = JSONB_COLUMNS.contains(col.getKey()) && col.getValue() instanceof String s
+                    ? JSONB.valueOf(s)
+                    : col.getValue();
             if (step == null) {
-                step = insertStep.set(field(name(col.getKey())), col.getValue());
+                step = insertStep.set(field(name(col.getKey())), colValue);
             } else {
-                step = step.set(field(name(col.getKey())), col.getValue());
+                step = step.set(field(name(col.getKey())), colValue);
             }
         }
         if (step == null) return;
