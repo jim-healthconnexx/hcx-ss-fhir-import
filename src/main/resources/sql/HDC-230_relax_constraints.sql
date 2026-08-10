@@ -46,6 +46,8 @@ ALTER TABLE fhir.medication_request ALTER COLUMN status DROP NOT NULL;
 ALTER TABLE fhir.medication_request ALTER COLUMN intent DROP NOT NULL;
 ALTER TABLE fhir.medication_request ALTER COLUMN medication_id DROP NOT NULL;
 ALTER TABLE fhir.medication_request ALTER COLUMN patient_id DROP NOT NULL;
+ALTER TABLE fhir.medication_request ALTER COLUMN requester_practitioner_id DROP NOT NULL; -- HDC-230: missing from initial narrow fix
+ALTER TABLE fhir.medication_request ALTER COLUMN authored_on DROP NOT NULL;             -- HDC-230: missing from initial narrow fix
 ALTER TABLE fhir.medication_request ALTER COLUMN meta_version_id DROP NOT NULL;
 ALTER TABLE fhir.medication_request ALTER COLUMN meta_last_updated DROP NOT NULL;
 ALTER TABLE fhir.medication_request_performer ALTER COLUMN bundle_id DROP NOT NULL;
