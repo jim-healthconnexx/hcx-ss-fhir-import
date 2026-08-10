@@ -190,6 +190,12 @@ public class FhirImportWriter {
                             fhirKey.resourceType(), fhirKey.fhirId(), entry.getKey(), tableName);
                 }
                 resolved.put(entry.getKey(), pk);
+            } else if (value instanceof List<?> list) {
+                // HDC-231: List<String> (e.g. given_values, prefix_values, line_values) must be
+                // converted to String[] so jOOQ can bind them as PostgreSQL text[] arrays.
+                resolved.put(entry.getKey(), list.stream()
+                        .map(item -> item == null ? null : item.toString())
+                        .toArray(String[]::new));
             } else {
                 resolved.put(entry.getKey(), value);
             }
