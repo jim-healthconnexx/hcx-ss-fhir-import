@@ -7,6 +7,7 @@ import com.healthconnexx.hcxssfhirimport.mapping.MappedBundle;
 import com.healthconnexx.hcxssfhirimport.model.ImportResult;
 import com.healthconnexx.hcxssfhirimport.writer.FhirImportWriter;
 import com.healthconnexx.hcxssfhirimport.writer.PanelStatusWriter;
+import com.healthconnexx.hcxssfhirimport.writer.RxHistoryResponseWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,7 @@ public class FhirImportService {
     private final FhirS3Service fhirS3Service;
     private final FhirImportWriter fhirImportWriter;
     private final PanelStatusWriter panelStatusWriter;
+    private final RxHistoryResponseWriter rxHistoryResponseWriter;
     private final ObjectMapper objectMapper;
 
     public ImportResult processAll() {
@@ -89,6 +91,9 @@ public class FhirImportService {
 
         // HDC-221: Update panel.status after successful DB write.
         populationId.ifPresent(ref -> panelStatusWriter.updatePanelStatus(ref, "FHIR Loaded"));
+
+        // HDC-238: Insert patient count summary row into healthdata.ss_rx_history_response.
+        populationId.ifPresent(rxHistoryResponseWriter::writeCountsForPopulation);
     }
 
     /**

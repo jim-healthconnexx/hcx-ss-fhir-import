@@ -113,31 +113,22 @@ CREATE TABLE healthdata.ss_patient_response_detail (
     CONSTRAINT PK_ss_patient_response_detail PRIMARY KEY (ss_patient_response_detail_id));
 
 CREATE TABLE healthdata.ss_rx_history_response (
-    ss_rx_history_response_id int GENERATED ALWAYS AS IDENTITY,
-    patient_file_id varchar(250) NOT NULL,
-    transmission_control_number varchar(10) NOT NULL,
-    file_name varchar(250) NOT NULL,
-    sent_time timestamptz NOT NULL,
-    total_count int NOT NULL,
-    patient_count int NOT NULL,
-    ok_count int NOT NULL,
-    multiple_response_count int NOT NULL,
-    empty_count int NOT NULL,
-    not_found_count int NOT NULL,
-    incomplete_count int NOT NULL,
-    error_count int NOT NULL,
-    unknown_count int NOT NULL,
-    inserted_on timestamptz NOT NULL,
-    updated_on timestamptz NULL,
-    CONSTRAINT PK_ss_rx_history_response PRIMARY KEY (ss_rx_history_response_id)
-    );
+   ss_rx_history_response_id int GENERATED ALWAYS AS IDENTITY,
+   reference_number varchar(10) NOT NULL,
+   total_count int NOT NULL,
+   patient_count int NOT NULL,
+   ok_count int NOT NULL,
+   multiple_response_count int NOT NULL,
+   empty_count int NOT NULL,
+   not_found_count int NOT NULL,
+   incomplete_count int NOT NULL,
+   error_count int NOT NULL,
+   unknown_count int NOT NULL,
+   inserted_on timestamptz NOT NULL,
+   updated_on timestamptz NULL,
+   CONSTRAINT PK_ss_rx_history_response PRIMARY KEY (ss_rx_history_response_id)
+);
 
-CREATE TABLE healthdata.ss_rx_history_response_detail (
-    ss_rx_history_response_detail_id int GENERATED ALWAYS AS IDENTITY,
-    ss_rx_history_response_id int NOT NULL,
-    fhir json NOT NULL,
-    inserted_on timestamptz NOT NULL,
-    CONSTRAINT PK_ss_rx_history_response_detail PRIMARY KEY (ss_rx_history_response_detail_id));
 
 alter table hcx.healthdata.customer 
 add column outgoing_request_location varchar(255);
