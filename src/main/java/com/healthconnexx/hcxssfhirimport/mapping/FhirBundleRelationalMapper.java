@@ -184,6 +184,8 @@ public final class FhirBundleRelationalMapper {
         FhirKey owner = key(r);
         JsonNode quantity = r.path("quantity");
         JsonNode daysSupply = r.path("daysSupply");
+        // HDC-240: extract substitution.wasSubstituted (optional — null if absent)
+        JsonNode substitution = r.path("substitution");
         rows.add(resourceRow("medication_dispense", bundle, owner, r, m(
                 "status", text(r, "status"), "medication_id", reference(r.path("medicationReference")),
                 "patient_id", reference(r.path("subject")),
@@ -191,7 +193,8 @@ public final class FhirBundleRelationalMapper {
                 "quantity_system", text(quantity, "system"), "quantity_code", text(quantity, "code"),
                 "days_supply_value", decimal(daysSupply, "value"), "days_supply_unit", text(daysSupply, "unit"),
                 "days_supply_system", text(daysSupply, "system"), "days_supply_code", text(daysSupply, "code"),
-                "when_prepared", fhirDateTime(r, "whenPrepared"), "when_handed_over", fhirDateTime(r, "whenHandedOver"))));
+                "when_prepared", fhirDateTime(r, "whenPrepared"), "when_handed_over", fhirDateTime(r, "whenHandedOver"),
+                "was_substituted", bool(substitution, "wasSubstituted"))));
         identifiers("medication_dispense_identifier", "medication_dispense_id", bundle, owner, r, rows);
         simpleCodings("medication_dispense_type_coding", "medication_dispense_id", bundle, owner, r.path("type").path("coding"), rows);
         extensions("medication_dispense_extension", "medication_dispense_id", bundle, owner, r, rows);

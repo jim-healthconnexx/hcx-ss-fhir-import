@@ -162,6 +162,7 @@ CREATE TABLE fhir.medication_dispense (
                                           days_supply_code       TEXT,
                                           when_prepared          TIMESTAMPTZ,
                                           when_handed_over       TIMESTAMPTZ,
+                                          was_substituted        TEXT,
                                           meta_version_id        TEXT,
                                           meta_last_updated      TIMESTAMPTZ,
                                           source_payload         JSONB,
