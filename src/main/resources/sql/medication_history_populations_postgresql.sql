@@ -100,6 +100,7 @@ CREATE TABLE fhir.medication (
                                  fhir_id                TEXT,
                                  meta_version_id        TEXT,
                                  meta_last_updated      TIMESTAMPTZ,
+                                 code_text              TEXT,
                                  source_payload         JSONB,
                                  CONSTRAINT uq_medication_bundle_fhir UNIQUE (bundle_id, fhir_id)
 );

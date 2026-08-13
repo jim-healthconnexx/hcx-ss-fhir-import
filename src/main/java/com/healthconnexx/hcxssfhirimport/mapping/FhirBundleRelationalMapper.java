@@ -144,7 +144,9 @@ public final class FhirBundleRelationalMapper {
 
     private void mapMedication(FhirKey bundle, JsonNode r, List<TableRow> rows) {
         FhirKey owner = key(r);
-        rows.add(resourceRow("medication", bundle, owner, r, m()));
+        // HDC-241: extract code.text (human-readable drug name string)
+        rows.add(resourceRow("medication", bundle, owner, r, m(
+                "code_text", text(r.path("code"), "text"))));
         identifiers("medication_identifier", "medication_id", bundle, owner, r, rows);
         codings("medication_code_coding", "medication_id", bundle, owner, r.path("code").path("coding"), rows);
     }
