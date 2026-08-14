@@ -1,11 +1,12 @@
 package com.healthconnexx.hcxssfhirimport.writer;
 
-import static org.jooq.impl.DSL.exists;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.name;
 import static org.jooq.impl.DSL.selectOne;
 import static org.jooq.impl.DSL.table;
 import static org.jooq.impl.DSL.val;
+
+import org.jooq.impl.DSL;
 
 import com.healthconnexx.hcxssfhirimport.mapping.FhirKey;
 import com.healthconnexx.hcxssfhirimport.mapping.MappedBundle;
@@ -145,28 +146,29 @@ public class DuplicatePatientChecker {
     }
 
     // HDC-243: Check B — verify patient demographics match an existing record.
+    // Uses JOINs (not correlated EXISTS) to avoid jOOQ alias-scope issues.
+    // given_values[1] (PostgreSQL 1-based) = first name; middle name is not required.
     private boolean patientExists(PatientFields f) {
-        String[] givenArray = f.given.toArray(new String[0]);
+        String firstName = f.given.isEmpty() ? null : f.given.get(0);
+        if (firstName == null) {
+            log.warn("HDC-243: given_values[0] (first name) is null — cannot match patient; proceeding with import");
+            return false;
+        }
 
         boolean found = dslContext.fetchExists(
                 selectOne()
                         .from(table(name("fhir", "patient")).as("p"))
+                        .join(table(name("fhir", "patient_name")).as("pn"))
+                            .on(field(name("pn", "patient_id")).eq(field(name("p", "patient_id"))))
+                        .join(table(name("fhir", "patient_address")).as("pa"))
+                            .on(field(name("pa", "patient_id")).eq(field(name("p", "patient_id"))))
                         .where(field(name("p", "mrn")).eq(f.mrn))
                         .and(field(name("p", "gender")).eq(f.gender))
                         .and(field(name("p", "birth_date")).eq(f.birthDate))
-                        .and(exists(
-                                selectOne()
-                                        .from(table(name("fhir", "patient_name")).as("pn"))
-                                        .where(field(name("pn", "patient_id")).eq(field(name("p", "patient_id"))))
-                                        .and(field(name("pn", "family")).eq(f.family))
-                                        .and(field(name("pn", "given_values")).eq(
-                                                val(givenArray).cast(String[].class)))))
-                        .and(exists(
-                                selectOne()
-                                        .from(table(name("fhir", "patient_address")).as("pa"))
-                                        .where(field(name("pa", "patient_id")).eq(field(name("p", "patient_id"))))
-                                        .and(field(name("pa", "postal_code")).eq(f.postalCode)))));
-        log.debug("HDC-243: patient exists matching all demographics: {}", found);
+                        .and(field(name("pn", "family")).eq(f.family))
+                        .and(field(name("pa", "postal_code")).eq(f.postalCode))
+                        .and(DSL.condition("{0}[1] = {1}", field(name("pn", "given_values")), val(firstName))));
+        log.debug("HDC-243: patient exists matching demographics (incl. first name): {}", found);
         return found;
     }
 
