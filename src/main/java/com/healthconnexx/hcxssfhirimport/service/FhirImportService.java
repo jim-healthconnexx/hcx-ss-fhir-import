@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthconnexx.hcxssfhirimport.mapping.FhirBundleRelationalMapper;
 import com.healthconnexx.hcxssfhirimport.mapping.MappedBundle;
 import com.healthconnexx.hcxssfhirimport.model.ImportResult;
+import com.healthconnexx.hcxssfhirimport.writer.DuplicatePatientChecker;
 import com.healthconnexx.hcxssfhirimport.writer.FhirImportWriter;
 import com.healthconnexx.hcxssfhirimport.writer.PanelStatusWriter;
 import com.healthconnexx.hcxssfhirimport.writer.RxHistoryResponseWriter;
@@ -32,13 +33,11 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class FhirImportService {
 
-    private static final String POPULATION_ID_SYSTEM =
-            "http://fhirdocs.surescripts.net/identifiers/population-id";
-
     private final FhirS3Service fhirS3Service;
     private final FhirImportWriter fhirImportWriter;
     private final PanelStatusWriter panelStatusWriter;
     private final RxHistoryResponseWriter rxHistoryResponseWriter;
+    private final DuplicatePatientChecker duplicatePatientChecker;
     private final ObjectMapper objectMapper;
 
     public ImportResult processAll() {
@@ -85,6 +84,12 @@ public class FhirImportService {
 
         FhirBundleRelationalMapper mapper = new FhirBundleRelationalMapper(objectMapper);
         MappedBundle mappedBundle = mapper.mapBundle(root);
+
+        // HDC-243: Skip import if patient already exists with matching demographics.
+        if (duplicatePatientChecker.isDuplicate(mappedBundle, populationId.orElse(null), assigningAuthority)) {
+            log.info("HDC-243: Duplicate patient detected — skipping bundle from '{}'", key);
+            return;
+        }
 
         fhirImportWriter.persist(mappedBundle, assigningAuthority);
         log.info("HDC-221: Persisted bundle fhir_id={} from '{}'", mappedBundle.bundleKey().fhirId(), key);
