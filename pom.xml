@@ -84,6 +84,11 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>secretsmanager</artifactId>
         </dependency>
+        <!-- HDC-265: ECS client for triggering hcx-ss-export-processor on successful import -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>ecs</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
