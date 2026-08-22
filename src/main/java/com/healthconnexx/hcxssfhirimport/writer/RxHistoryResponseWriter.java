@@ -17,6 +17,9 @@ import java.time.OffsetDateTime;
  * by communication_reason_coding.code and inserts a summary row into
  * healthdata.ss_rx_history_response.
  *
+ * <p>HDC-272: Called once per unique reference_number after all files for a batch are processed,
+ * ensuring a single summary row per reference_number rather than one row per file.
+ *
  * <p>Code mappings (per HDC-238):
  * <ul>
  *   <li>crc.code IS NULL → ok_count</li>

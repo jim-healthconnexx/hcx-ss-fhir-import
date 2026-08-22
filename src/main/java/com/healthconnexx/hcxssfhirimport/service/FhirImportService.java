@@ -13,8 +13,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * HDC-221: Orchestrates FHIR file import.
@@ -45,11 +47,16 @@ public class FhirImportService {
         int success = 0;
         int error = 0;
 
+        // HDC-272: Collect unique reference_numbers across all files so the summary row
+        // is written once per reference_number rather than once per file.
+        Set<String> processedPopulationIds = new LinkedHashSet<>();
+
         for (String key : keys) {
             try {
-                processFile(key);
+                Optional<String> populationId = processFile(key);
                 fhirS3Service.moveToProcessed(key);
                 success++;
+                populationId.ifPresent(processedPopulationIds::add);
             } catch (Exception e) {
                 error++;
                 log.error("HDC-221: Failed to process FHIR file '{}' — moving to error/", key, e);
@@ -57,11 +64,22 @@ public class FhirImportService {
             }
         }
 
+        // HDC-272: Write exactly one ss_rx_history_response row per reference_number.
+        for (String populationId : processedPopulationIds) {
+            try {
+                rxHistoryResponseWriter.writeCountsForPopulation(populationId);
+            } catch (Exception e) {
+                log.error("HDC-272: Failed to write ss_rx_history_response for reference_number='{}' — skipping", populationId, e);
+            }
+        }
+
         log.info("HDC-221: Import complete — total={} success={} error={}", keys.size(), success, error);
         return new ImportResult(keys.size(), success, error);
     }
 
-    private void processFile(String key) throws Exception {
+    // HDC-272: Returns the populationId so processAll() can deduplicate and write
+    // ss_rx_history_response once per reference_number after all files are processed.
+    private Optional<String> processFile(String key) throws Exception {
         log.info("HDC-221: Processing FHIR file '{}'", key);
 
         String json = fhirS3Service.download(key);
@@ -88,7 +106,7 @@ public class FhirImportService {
         // HDC-243: Skip import if patient already exists with matching demographics.
         if (duplicatePatientChecker.isDuplicate(mappedBundle, populationId.orElse(null), assigningAuthority)) {
             log.info("HDC-243: Duplicate patient detected — skipping bundle from '{}'", key);
-            return;
+            return populationId;
         }
 
         fhirImportWriter.persist(mappedBundle, assigningAuthority);
@@ -97,8 +115,7 @@ public class FhirImportService {
         // HDC-221: Update panel.status after successful DB write.
         populationId.ifPresent(ref -> panelStatusWriter.updatePanelStatus(ref, "FHIR Loaded"));
 
-        // HDC-238: Insert patient count summary row into healthdata.ss_rx_history_response.
-        populationId.ifPresent(rxHistoryResponseWriter::writeCountsForPopulation);
+        return populationId;
     }
 
     /**
