@@ -12,10 +12,6 @@ name: Deploy to Production
 
 on:
   workflow_dispatch:
-    inputs:
-      reason:
-        description: 'Reason for manual deploy'
-        required: true
 
 permissions:
   id-token: write
@@ -25,6 +21,7 @@ jobs:
   deploy:
     name: Build and Deploy to Production
     runs-on: ubuntu-latest
+    environment: hcx-prod
     # HDC-221: When production secrets are set up, create a hcx-prod GitHub environment,
     # add secrets there, and set: environment: hcx-prod
 
