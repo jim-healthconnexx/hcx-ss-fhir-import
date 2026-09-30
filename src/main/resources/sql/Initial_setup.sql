@@ -148,8 +148,8 @@ values ('rxhist','RX History', 'Medication History Service', '{
 "HDR": {
     "RecordType": "HDR",
     "Version": "3.0",
-    "SenderID": "T00000000022665",
-    "Password": "SFTEB2ZLLR",
+    "SenderID": "T00000000022794",
+    "Password": "JUO2N7IFDP",
     "ReceiverID": "S00000000000003",
     "transmissionControlNumber": "panel.referenceNumber",
     "TransmissionDate": "Current date in YYYYMMDD",
