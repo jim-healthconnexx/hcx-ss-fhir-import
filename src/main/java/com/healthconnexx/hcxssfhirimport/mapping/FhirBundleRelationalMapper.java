@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -348,9 +348,11 @@ public final class FhirBundleRelationalMapper {
     private static BigDecimal decimal(JsonNode node, String field) { return node.path(field).isNumber() ? node.path(field).decimalValue() : null; }
     private static LocalDate localDate(JsonNode node, String field) { String v = text(node, field); return v == null || v.isBlank() ? null : LocalDate.parse(v); }
     private static OffsetDateTime dateTime(JsonNode node, String field) { String v = text(node, field); return v == null || v.isBlank() ? null : OffsetDateTime.parse(v); }
-    private static OffsetDateTime fhirDateTime(JsonNode node, String field) {
+    // HDC-294: returns the literal wall-clock value as written in the FHIR message, dropping
+    // any zone offset, so the stored date never shifts based on a reading client's timezone.
+    private static LocalDateTime fhirDateTime(JsonNode node, String field) {
         String v = text(node, field); if (v == null || v.isBlank()) return null;
-        return v.length() == 10 ? LocalDate.parse(v).atStartOfDay().atOffset(ZoneOffset.UTC) : OffsetDateTime.parse(v);
+        return v.length() == 10 ? LocalDate.parse(v).atStartOfDay() : OffsetDateTime.parse(v).toLocalDateTime();
     }
     private static List<String> stringList(JsonNode node, String field) {
         return array(node, field).stream().filter(JsonNode::isTextual).map(JsonNode::textValue).toList();

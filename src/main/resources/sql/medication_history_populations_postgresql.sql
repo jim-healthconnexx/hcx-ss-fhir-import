@@ -161,8 +161,8 @@ CREATE TABLE fhir.medication_dispense (
                                           days_supply_unit       TEXT,
                                           days_supply_system     TEXT,
                                           days_supply_code       TEXT,
-                                          when_prepared          TIMESTAMPTZ,
-                                          when_handed_over       TIMESTAMPTZ,
+                                          when_prepared          TIMESTAMP, -- HDC-294: no time zone; literal wall-clock value from FHIR, not normalized to UTC
+                                          when_handed_over       TIMESTAMP, -- HDC-294: no time zone; literal wall-clock value from FHIR, not normalized to UTC
                                           was_substituted        TEXT,
                                           meta_version_id        TEXT,
                                           meta_last_updated      TIMESTAMPTZ,
