@@ -10,6 +10,8 @@ import org.jooq.DSLContext;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 /**
  * HDC-221: Updates panel.status in the healthdata schema after a successful FHIR bundle import.
  * Identified by panel.reference_number which equals the FHIR population-id.
@@ -21,18 +23,25 @@ public class PanelStatusWriter {
 
     private final DSLContext dslContext;
 
+    /**
+     * HDC-221: Updates panel.status for the given reference_number.
+     * HDC-309: Returns the matched panel_id (via RETURNING) so callers can write a
+     * corresponding healthdata.panel_tracker row; empty when no panel matched.
+     */
     @Transactional
-    public void updatePanelStatus(String referenceNumber, String status) {
+    public Optional<Integer> updatePanelStatus(String referenceNumber, String status) {
         try {
-            int updated = dslContext.update(table(name("healthdata", "panel")))
+            Integer panelId = dslContext.update(table(name("healthdata", "panel")))
                     .set(field(name("status")), status)
                     .where(field(name("reference_number")).eq(referenceNumber))
-                    .execute();
-            if (updated == 0) {
+                    .returning(field(name("panel_id"), Integer.class))
+                    .fetchOne(field(name("panel_id"), Integer.class));
+            if (panelId == null) {
                 log.warn("HDC-221: No panel found with reference_number='{}'; status not updated", referenceNumber);
-            } else {
-                log.info("HDC-221: Updated panel reference_number='{}' status to '{}'", referenceNumber, status);
+                return Optional.empty();
             }
+            log.info("HDC-221: Updated panel reference_number='{}' status to '{}'", referenceNumber, status);
+            return Optional.of(panelId);
         } catch (RuntimeException e) {
             log.error("HDC-221: Failed to update panel reference_number='{}' status to '{}'",
                     referenceNumber, status, e);
