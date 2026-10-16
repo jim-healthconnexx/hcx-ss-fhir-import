@@ -46,6 +46,19 @@ public class FhirImportWriter {
     // HDC-228: Columns that require JSONB binding — jOOQ will not auto-cast String → JSONB.
     private static final Set<String> JSONB_COLUMNS = Set.of("source_payload");
 
+    // HDC-312: table.column pairs for FK columns that map to optional (0..1/0..*) FHIR reference
+    // elements, which may legitimately point to a resource not included in the submitted bundle
+    // (e.g. a MedicationRequest.reasonReference pointing to a Condition recorded elsewhere). An
+    // unresolved FhirKey for these columns is expected/benign and should not be logged as ERROR.
+    // Table-qualified so this doesn't also match required same-named "owner" FK columns (e.g.
+    // organization_identifier.organization_id, which must always resolve to its parent row).
+    private static final Set<String> OPTIONAL_REFERENCE_COLUMNS = Set.of(
+            "medication_request.reason_condition_id",
+            "medication_request.requester_practitioner_id",
+            "medication_request_performer.organization_id",
+            "medication_dispense_performer.organization_id",
+            "medication_dispense_prescription.medication_request_id");
+
     // HDC-221: Ordered list of table names for dependency-safe insertion.
     private static final List<String> INSERT_ORDER = List.of(
             "bundle",
@@ -186,8 +199,19 @@ public class FhirImportWriter {
             if (value instanceof FhirKey fhirKey) {
                 Long pk = pkMap.get(fhirKey);
                 if (pk == null) {
-                    log.error("HDC-221: Unresolved FhirKey {}:{} in column '{}' of table '{}'",
-                            fhirKey.resourceType(), fhirKey.fhirId(), entry.getKey(), tableName);
+                    // HDC-312: Optional FHIR references (e.g. reasonReference, requester) may
+                    // legitimately point to a resource outside the submitted bundle — that's not
+                    // a mapping error, so it's logged at WARN rather than ERROR. Unresolved
+                    // references for required columns still log at ERROR since they indicate a
+                    // genuine ordering/mapping bug.
+                    if (OPTIONAL_REFERENCE_COLUMNS.contains(tableName + "." + entry.getKey())) {
+                        log.warn("HDC-312: Unresolved FhirKey {}:{} in column '{}' of table '{}' — "
+                                        + "referenced resource was not included in this bundle; storing NULL",
+                                fhirKey.resourceType(), fhirKey.fhirId(), entry.getKey(), tableName);
+                    } else {
+                        log.error("HDC-221: Unresolved FhirKey {}:{} in column '{}' of table '{}'",
+                                fhirKey.resourceType(), fhirKey.fhirId(), entry.getKey(), tableName);
+                    }
                 }
                 resolved.put(entry.getKey(), pk);
             } else if (value instanceof List<?> list) {
